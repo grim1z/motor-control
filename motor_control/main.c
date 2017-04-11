@@ -20,12 +20,29 @@
 //#define SIMULATOR
 #define MOTOR_NBR 4
 
+extern uint32_t i2c_data_ready;
+extern uint8_t i2c_reg;
+extern uint8_t i2c_data;
+
 extern uint8_t dbg_changedbits;
+
+extern void init_regmap(void);
+extern uint8_t register_map[32];
 
 uint8_t enc_count[MOTOR_NBR];
 char str[64];
 
-/* P, I and D parameter values
+#define DBG
+#ifdef DBG
+#define DEBUG_PRINT(fmt, args...) 		{ \
+	sprintf((char*)str, fmt, args); \
+	USART_0_put_string(str); \
+}
+#else
+#define DEBUG_PRINT(fmt, args...)
+#endif
+
+/*! \brief P, I and D parameter values
  *
  * The K_P, K_I and K_D values (P, I and D gains)
  * need to be modified to adapt to the application at hand
@@ -46,11 +63,15 @@ int main(void)
 	uint16_t previous_time, duration;
 	uint8_t i;
 
+	i2c_data_ready = 0;
+
 	/* Initialize counter values before interrupts are enabled */
 	for(i=0; i<MOTOR_NBR; i++) {
 		prev_enc_count[i] = 0;
 		enc_count[i] = 0;
 	}
+
+	init_regmap();
 
 	/* Initializes MCU, drivers and middleware */
 	atmel_start_init();
@@ -78,14 +99,25 @@ int main(void)
 	}
 
 	while(1) {
+		if(i2c_data_ready != 0)	{
+			for(i=0; i<4; i++) {
+				if(register_map[i+1] == 0)
+					referenceValue[i] = 0;
+				else
+					referenceValue[i] = register_map[i+1]/16; /* TODO: put correct calculation */
+				i2c_data_ready &= ~(1<<(i+1));	
+				DEBUG_PRINT("Updated register %d with %d\n", i, referenceValue[i]);
+			}
+		}
+
 		previous_time = TCNT1;
 		//USART_0_transmit('v');
 
 		/* Run PID calculations once every PID timer timeout */
-		referenceValue[0] = 2; // RR speed target
-		referenceValue[1] = 2; // FR speed target
-		referenceValue[2] = 2; // FL speed target
-		referenceValue[3] = 2; // RL speed target
+//		referenceValue[0] = 2; // RR speed target
+//		referenceValue[1] = 2; // FR speed target
+//		referenceValue[2] = 2; // FL speed target
+//		referenceValue[3] = 2; // RL speed target
 
 		for(i=0; i<MOTOR_NBR; i++) {
 			tmp = enc_count[i];

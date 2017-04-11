@@ -44,3 +44,101 @@ ISR(PCINT1_vect)
 		enc_count[3]++;
 	}
 }
+
+uint32_t i2c_data_ready;
+uint8_t reg_addr;
+uint8_t is_addr=0;
+
+enum registers {
+	ID,
+	GSR,
+	RLSPDSET,
+	RLSPDGET,
+	RLSTS,
+	RRSPDSET,
+	RRSPDGET,
+	RRSTS,
+	FLSPDSET,
+	FLSPDGET,
+	FLSTS,
+	FRSPDSET,
+	FRSPDGET,
+	FRSTS,
+	/* */
+	END_REGLIST
+};
+
+uint8_t register_map[END_REGLIST];
+
+#define START_WRITE 0x60
+#define START_READ 0xA8
+#define CONTINUE_READ 0xB8
+#define STOP_WRITE 0xA0
+#define WRITE 0x80
+#define STOP_READ 0xC0
+
+
+void init_regmap(void)
+{
+	int i;
+
+	for (i=0; i< END_REGLIST; i++) {
+		register_map[i] = 0;
+	}
+
+	register_map[ID] = 0x01;
+}
+
+ISR(TWI_vect)
+{				
+//	cpu_irq_disable();
+	switch(TWSR & 0xFC) {
+		case START_WRITE: 
+			TWCR |= 1<< TWINT;
+			TWCR |= 1<< TWEA;
+			is_addr = 1;
+			break;
+			
+		case WRITE:
+			if (is_addr) {
+				reg_addr = TWDR;
+				if (reg_addr >= sizeof(register_map)) {
+					reg_addr = sizeof(register_map) - 1;
+				}
+//				DEBUG_PRINT("Set address %x\n", reg_addr);
+				is_addr = 0;
+			} else {
+				*(uint8_t*)(register_map + reg_addr) = TWDR;
+//				DEBUG_PRINT("write register  %x with %x\n", reg_addr,*(uint8_t*)(register_map + reg_addr) );
+				if (reg_addr++ >= sizeof(register_map)) {
+					reg_addr = sizeof(register_map) - 1;
+				}
+				i2c_data_ready |= 1 << reg_addr;
+			}
+			TWCR |= 1<<TWINT;
+			TWCR |= 1<< TWEA;
+			break;
+			
+		case STOP_WRITE:
+			TWCR |= 1<< TWINT;
+			break;
+			
+		case START_READ:
+		case CONTINUE_READ:		
+			TWDR = *(uint8_t*)(register_map + reg_addr);
+			//DEBUG_PRINT("Read register %x = %x\n", reg_addr,*(uint8_t*)(register_map + reg_addr) )
+			TWCR |= 1 << TWINT;
+			TWCR |= 1<< TWEA;
+			if (reg_addr++ >= sizeof(register_map)) {
+				reg_addr = sizeof(register_map) - 1;	
+			}
+			break;
+				
+		case STOP_READ:
+			TWCR |= 1 << TWINT;
+			TWCR |= 1 << TWEA;
+			break;
+	}
+//	cpu_irq_enable();
+}
+
