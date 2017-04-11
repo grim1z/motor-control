@@ -105,7 +105,7 @@ int main(void)
 					referenceValue[i] = 0;
 				else
 					referenceValue[i] = register_map[i+1]/16; /* TODO: put correct calculation */
-				i2c_data_ready &= ~(1<<(i+1));	
+				i2c_data_ready &= ~(1<<(i+1));
 				DEBUG_PRINT("Updated register %d with %d\n", i, referenceValue[i]);
 			}
 		}

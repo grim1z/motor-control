@@ -90,15 +90,15 @@ void init_regmap(void)
 }
 
 ISR(TWI_vect)
-{				
+{
 //	cpu_irq_disable();
 	switch(TWSR & 0xFC) {
-		case START_WRITE: 
+		case START_WRITE:
 			TWCR |= 1<< TWINT;
 			TWCR |= 1<< TWEA;
 			is_addr = 1;
 			break;
-			
+
 		case WRITE:
 			if (is_addr) {
 				reg_addr = TWDR;
@@ -118,22 +118,22 @@ ISR(TWI_vect)
 			TWCR |= 1<<TWINT;
 			TWCR |= 1<< TWEA;
 			break;
-			
+
 		case STOP_WRITE:
 			TWCR |= 1<< TWINT;
 			break;
-			
+
 		case START_READ:
-		case CONTINUE_READ:		
+		case CONTINUE_READ:
 			TWDR = *(uint8_t*)(register_map + reg_addr);
 			//DEBUG_PRINT("Read register %x = %x\n", reg_addr,*(uint8_t*)(register_map + reg_addr) )
 			TWCR |= 1 << TWINT;
 			TWCR |= 1<< TWEA;
 			if (reg_addr++ >= sizeof(register_map)) {
-				reg_addr = sizeof(register_map) - 1;	
+				reg_addr = sizeof(register_map) - 1;
 			}
 			break;
-				
+
 		case STOP_READ:
 			TWCR |= 1 << TWINT;
 			TWCR |= 1 << TWEA;
